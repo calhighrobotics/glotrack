@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <GLES3/gl3.h>
 #include <GLFW/glfw3.h>
 #include <opencv2/core.hpp>
 #include <string>

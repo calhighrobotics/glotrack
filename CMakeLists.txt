@@ -1,10 +1,13 @@
-cmake_minimum_required(VERSION 4.4.0)
+cmake_minimum_required(VERSION 3.24)
 
 project(glotrack
-    VERSION 0.1.0
+    VERSION 0.1.1
+    LANGUAGES CXX
 )
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(OpenCV REQUIRED COMPONENTS
@@ -47,22 +50,33 @@ add_executable(glotrack
     ${IMPLOT_SRC}
 )
 
+target_sources(glotrack PRIVATE
+    src/main.cpp
+    src/KalmanFilter.cpp
+    src/PoseLogger.cpp
+    src/LocalizationPipeline.cpp
+    src/util.cpp
+)
+
 target_include_directories(glotrack PRIVATE
     imgui
     implot
 )
 
-target_sources(glotrack
-    PRIVATE
-        src/main.cpp
-        src/KalmanFilter.cpp
-        src/PoseLogger.cpp
-        src/LocalizationPipeline.cpp
-        src/util.cpp
-)
+#
+# Portable OpenGL target
+#
+
+if(TARGET OpenGL::OpenGL)
+    set(GLOTRACK_OPENGL_TARGET OpenGL::OpenGL)
+elseif(TARGET OpenGL::GL)
+    set(GLOTRACK_OPENGL_TARGET OpenGL::GL)
+else()
+    message(FATAL_ERROR "No suitable OpenGL target exported by FindOpenGL.")
+endif()
 
 target_link_libraries(glotrack PRIVATE
-    OpenGL::OpenGL
+    ${GLOTRACK_OPENGL_TARGET}
     glfw
     ${OpenCV_LIBS}
 )
@@ -75,8 +89,8 @@ include(GNUInstallDirs)
 
 install(
     TARGETS glotrack
-    RUNTIME DESTINATION .
-    LIBRARY DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     BUNDLE DESTINATION .
 )
 
@@ -90,12 +104,9 @@ if(UNIX AND NOT APPLE)
     )
 endif()
 
-
 #
 # Packaging
 #
-
-include(CPack)
 
 set(CPACK_PACKAGE_NAME "glotrack")
 set(CPACK_PACKAGE_VENDOR "glotrack")
@@ -109,3 +120,5 @@ set(CPACK_GENERATOR
 set(CPACK_PACKAGE_FILE_NAME
     "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}"
 )
+
+include(CPack)

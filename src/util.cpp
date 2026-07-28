@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "util.hpp"
+#ifdef _WIN32
+#include <GL/glext.h>
+#endif
 #include <iostream>
 #include <opencv2/calib.hpp>
 #include <opencv2/geometry/3d.hpp>

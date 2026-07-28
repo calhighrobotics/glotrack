@@ -8,7 +8,6 @@
 #include "imgui.h"
 #include "implot.h"
 #include "util.hpp"
-#include <GLES3/gl3.h>
 #include <GLFW/glfw3.h>
 #include <cstdint>
 #include <cstdio>

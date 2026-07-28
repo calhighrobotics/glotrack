@@ -13,48 +13,83 @@ env:
 
 jobs:
   build:
+
     strategy:
       fail-fast: false
       matrix:
         include:
+
           - os: ubuntu-latest
             artifact: glotrack-linux.tar.gz
             triplet: x64-linux
 
           - os: macos-latest
             artifact: glotrack-macos.tar.gz
-            triplet: x64-osx
+            triplet: arm64-osx
 
           - os: windows-latest
             artifact: glotrack-windows.zip
             triplet: x64-windows
 
+
     runs-on: ${{ matrix.os }}
 
     steps:
+
+      #
+      # Checkout
+      #
+
       - name: Checkout project
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          submodules: recursive
 
 
       #
-      # Build tools
+      # Dependencies
       #
 
-      - name: Install Linux tools
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
+
           sudo apt-get install -y \
             ninja-build \
-            cmake \
-            git
+            gcc-14 \
+            g++-14 \
+            libwayland-dev \
+            libxkbcommon-dev \
+            wayland-protocols \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev
 
-      - name: Install macOS tools
+
+      - name: Select GCC 14 toolchain
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          echo "CC=gcc-14" >> $GITHUB_ENV
+          echo "CXX=g++-14" >> $GITHUB_ENV
+
+
+      - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install ninja cmake
+          brew install ninja
+
+
+      - name: Select macOS Clang toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
 
 
       #
@@ -68,10 +103,12 @@ jobs:
           path: vcpkg
           fetch-depth: 1
 
+
       - name: Bootstrap vcpkg
         shell: bash
         run: |
           ./vcpkg/bootstrap-vcpkg.sh
+
 
       - name: Cache vcpkg
         uses: actions/cache@v4
@@ -81,9 +118,12 @@ jobs:
             vcpkg/buildtrees
             vcpkg/packages
             vcpkg/installed
-          key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
 
-      - name: Install GLFW
+          key: |
+            vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+
+
+      - name: Install vcpkg dependencies
         shell: bash
         run: |
           ./vcpkg/vcpkg install \
@@ -91,154 +131,150 @@ jobs:
 
 
       #
-      # OpenCV 5
+      # OpenCV
       #
 
       - name: Cache OpenCV
         id: opencv-cache
         uses: actions/cache@v4
         with:
-          path: opencv-install
-          key: opencv-${{ env.OPENCV_VERSION }}-${{ runner.os }}
+          path: |
+            opencv
+            opencv-install
 
-      - name: Build OpenCV
-        if: steps.opencv-cache.outputs.cache-hit != 'true'
+          key: |
+            opencv-v2-${{ env.OPENCV_VERSION }}-${{ runner.os }}-${{ matrix.triplet }}
+
+          restore-keys: |
+            opencv-v2-${{ env.OPENCV_VERSION }}-${{ runner.os }}-
+
+
+      - name: Download OpenCV
         shell: bash
         run: |
-          git clone \
-            --depth 1 \
-            --branch ${{ env.OPENCV_VERSION }} \
-            https://github.com/opencv/opencv.git
+          if [ ! -d opencv ]; then
+            git clone \
+              --depth 1 \
+              --branch ${{ env.OPENCV_VERSION }} \
+              https://github.com/opencv/opencv.git
+          fi
 
-          cmake -S opencv -B opencv-build \
+
+      - name: Configure OpenCV (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+
+          cmake \
+            -S opencv \
+            -B opencv-build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/opencv-install \
+            ${{ runner.os == 'Linux' && '-DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14' || '' }} \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_PERF_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_opencv_java=OFF \
+            -DBUILD_opencv_python3=OFF \
+            -DBUILD_opencv_dnn=OFF \
+            -DWITH_PROTOBUF=OFF \
+            -DWITH_CUDA=OFF
+
+
+      - name: Configure OpenCV (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+
+          cmake \
+            -S opencv \
+            -B opencv-build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/opencv-install \
             -DBUILD_TESTS=OFF \
             -DBUILD_PERF_TESTS=OFF \
-            -DBUILD_EXAMPLES=OFF
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_opencv_java=OFF \
+            -DBUILD_opencv_python3=OFF \
+            -DBUILD_opencv_dnn=OFF \
+            -DWITH_PROTOBUF=OFF \
+            -DWITH_CUDA=OFF
 
-          cmake --build opencv-build --parallel
+
+      - name: Build OpenCV
+        shell: bash
+        run: |
+
+          cmake --build opencv-build \
+            --parallel 2
+
+
+      - name: Install OpenCV
+        shell: bash
+        run: |
+
           cmake --install opencv-build
 
 
+
       #
-      # Configure
+      # Build glotrack
       #
 
-      - name: Configure
+      - name: Configure project (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
-          cmake -B build \
+          cmake \
+            -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DOpenCV_DIR=$GITHUB_WORKSPACE/opencv-install/lib/cmake/opencv5
-
-
-      #
-      # Build
-      #
-
-      - name: Build
+      
+      - name: Configure project (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
+          OPENCV_DIR=$(find "$GITHUB_WORKSPACE/opencv-install" \
+            -name OpenCVConfig.cmake \
+            -exec dirname {} \; \
+            | head -n 1)
+
+          if [ -z "$OPENCV_DIR" ]; then
+            echo "ERROR: OpenCVConfig.cmake not found"
+            find "$GITHUB_WORKSPACE/opencv-install" -type f
+            exit 1
+          fi
+
+          echo "Found OpenCV at: $OPENCV_DIR"
+
+          cmake \
+            -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DOpenCV_DIR="$OPENCV_DIR"
+
+
+      - name: Build project
+        shell: bash
+        run: |
+
           cmake --build build \
-            --config Release \
             --parallel
 
 
-      #
-      # Install
-      #
 
-      - name: Install
-        run: |
-          cmake --install build --prefix package
-
-
-      #
-      # Collect runtime libraries
-      #
-
-      - name: Collect Linux runtime libraries
-        if: runner.os == 'Linux'
+      - name: Install project
         shell: bash
         run: |
-          mkdir -p package/libs
 
-          ldd package/glotrack |
-          awk '/=> \// {print $3}' |
-          while read lib; do
+          cmake --install build \
+            --prefix package
 
-            case "$lib" in
-              /lib/x86_64-linux-gnu/libc.so.*)
-                ;;
-              /lib/x86_64-linux-gnu/libm.so.*)
-                ;;
-              /lib/x86_64-linux-gnu/libpthread.so.*)
-                ;;
-              /lib/x86_64-linux-gnu/libdl.so.*)
-                ;;
-              /lib/x86_64-linux-gnu/librt.so.*)
-                ;;
-              /lib/x86_64-linux-gnu/libgcc_s.so.*)
-                ;;
-              /usr/lib/x86_64-linux-gnu/libstdc++.so.*)
-                ;;
-              /usr/lib/x86_64-linux-gnu/libGL.so.*)
-                ;;
-              /usr/lib/x86_64-linux-gnu/libEGL.so.*)
-                ;;
-              *)
-                cp "$lib" package/libs/
-                ;;
-            esac
-
-          done
-
-
-      - name: Collect macOS runtime libraries
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          mkdir -p package/libs
-
-          otool -L package/glotrack |
-          tail -n +2 |
-          awk '{print $1}' |
-          while read lib; do
-
-            case "$lib" in
-              /System/*)
-                ;;
-              /usr/lib/*)
-                ;;
-              *)
-                cp "$lib" package/libs/
-                ;;
-            esac
-
-          done
-
-
-      - name: Collect Windows runtime libraries
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          mkdir package\libs
-
-          $dllDirs = @(
-            "vcpkg\installed\x64-windows\bin",
-            "opencv-install\x64\vc17\bin"
-          )
-
-          foreach ($dir in $dllDirs) {
-            if (Test-Path $dir) {
-              Copy-Item `
-                "$dir\*.dll" `
-                package\libs\
-            }
-          }
 
 
       #
@@ -247,17 +283,22 @@ jobs:
 
       - name: Package Linux/macOS
         if: runner.os != 'Windows'
+        shell: bash
         run: |
+
           tar -czf ${{ matrix.artifact }} \
             -C package .
+
 
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive `
-            -Path package\* `
+
+          Compress-Archive \
+            -Path package\* \
             -DestinationPath ${{ matrix.artifact }}
+
 
 
       #
@@ -267,24 +308,33 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
+
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
 
 
+
   release:
+
     needs: build
+
     runs-on: ubuntu-latest
 
+
     steps:
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
 
+
       - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
+
           draft: true
+
           files: |
             *.tar.gz
             *.zip

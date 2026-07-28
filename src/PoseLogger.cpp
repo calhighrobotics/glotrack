@@ -68,7 +68,7 @@ void PoseLogger::workerLoop(this PoseLogger& self, std::stop_token stopToken) {
         }
 
         if ((self.m_target == LogTarget::File || self.m_target == LogTarget::Both) && self.m_fileStream.is_open()) {
-            std::print(self.m_fileStream, "{}", message);
+            self.m_fileStream << message;
         }
     }
 }
