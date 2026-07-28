@@ -1,6 +1,6 @@
 # Glotrack
 
-> Simple global field localization, designed with the needs of the VEX Robotics Competition.
+> Simple global field localization providing a ground-truth reference, designed for VEX Robotics
 
 Glotrack is built for aspiring programmers to test out their own localization algorithms by providing a ground-truth pose reference. It's built upon [OpenCV](https://opencv.org/) for the Apriltag detection and [Dear ImGui](https://github.com/ocornut/imgui) for the UI.
 
@@ -26,3 +26,7 @@ After installing these dependencies (`OpenCV OpenGL glfw3`) and cloning the repo
 2. `cmake --build build`.
 
 The path of the generated executable is `./build/tracker`.
+
+## License
+
+Copyright (C) 2026 DataTopping. This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses/>.

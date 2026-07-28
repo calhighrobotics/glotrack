@@ -1,3 +1,6 @@
+// Copyright 2026 DataTopping
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "AppContext.hpp"
 #include "LocalizationPipeline.hpp"
 #include "backends/imgui_impl_glfw.h"

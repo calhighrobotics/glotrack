@@ -1,3 +1,6 @@
+// Copyright 2026 DataTopping
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "LocalizationPipeline.hpp"
 #include "imgui.h"
 #include <opencv2/calib3d.hpp>

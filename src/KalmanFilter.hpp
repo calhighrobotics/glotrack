@@ -1,3 +1,6 @@
+// Copyright 2026 DataTopping
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <opencv2/core/types.hpp>
 #include <opencv2/video/tracking.hpp>
 

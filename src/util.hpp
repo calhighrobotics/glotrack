@@ -1,3 +1,6 @@
+// Copyright 2026 DataTopping
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #pragma once
 
 #include <GLES3/gl3.h>

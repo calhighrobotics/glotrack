@@ -1,0 +1,80 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Run vcpkg bootstrap
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        ./vcpkg/bootstrap-vcpkg.sh
+      shell: bash
+
+    - name: Install Dependencies
+      run: |
+        ./vcpkg/vcpkg install opencv glfw3
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
+    - name: Build Project
+      run: cmake --build build --config Release
+
+    - name: Prepare Artifacts
+      shell: bash
+      run: |
+        mkdir -p packed
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          cp build/Release/glotrack.exe packed/glotrack-windows.exe
+        elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+          cp build/glotrack packed/glotrack-macos || cp build/Release/glotrack packed/glotrack-macos
+        else
+          cp build/glotrack packed/glotrack-linux
+        fi
+
+    - name: Upload Artifacts to Job
+      uses: actions/upload-artifact@v4
+      with:
+        name: glotrack-binaries-${{ matrix.os }}
+        path: packed/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: downloaded-artifacts
+
+    - name: Flatten Artifact Directory
+      run: |
+        mkdir -p final-release-assets
+        find downloaded-artifacts -type f -exec cp {} final-release-assets/ \;
+
+    - name: Create Draft GitHub Release and Upload Assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: final-release-assets/*
+        draft: true
+        prerelease: false
