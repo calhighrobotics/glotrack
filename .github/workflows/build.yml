@@ -289,17 +289,11 @@ jobs:
           tar -czf ${{ matrix.artifact }} \
             -C package .
 
-
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-
-          Compress-Archive \
-            -Path package\* \
-            -DestinationPath ${{ matrix.artifact }}
-
-
+          Compress-Archive -Path package\* -DestinationPath "${{ matrix.artifact }}"
 
       #
       # Upload

@@ -3,8 +3,8 @@
 
 #include "PoseLogger.hpp"
 
-#include <print>
 #include <format>
+#include <iostream>
 #include <utility>
 
 PoseLogger::~PoseLogger() {
@@ -64,7 +64,7 @@ void PoseLogger::workerLoop(this PoseLogger& self, std::stop_token stopToken) {
         }
 
         if (self.m_target == LogTarget::Console || self.m_target == LogTarget::Both) {
-            std::print("{}", message);
+            std::cout << message;
         }
 
         if ((self.m_target == LogTarget::File || self.m_target == LogTarget::Both) && self.m_fileStream.is_open()) {
